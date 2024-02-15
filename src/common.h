@@ -5,4 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+// for generating logs of the VM
+#define DEBUG_TRACE_EXECUTION
+
 #endif

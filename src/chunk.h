@@ -7,7 +7,12 @@
 typedef enum
 {
     OP_CONSTANT,
-    OP_RETURN
+    OP_ADD,
+    OP_SUBTRACT,
+    OP_MULTIPLY,
+    OP_DIVIDE,
+    OP_NEGATE,
+    OP_RETURN,
 } OpCode;
 
 typedef struct
@@ -16,8 +21,9 @@ typedef struct
     int capacity;
     /* Dynamic array containing all the byte code */
     uint8_t *code;
-    /* Store all lines corresponding to bytecode to show line numbers in errors */
-    int*lines;
+    /* Store all lines corresponding to bytecode to show line numbers in errors
+     */
+    int *lines;
     /* A dynamic array which will store all the compile time constants */
     ValueArray constants;
 } Chunk;
