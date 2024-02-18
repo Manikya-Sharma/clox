@@ -23,5 +23,5 @@ $(OBJDIR)/main.o: $(SRCDIR)/main.c $(SRCDIR)/common.h
 clean:
 	rm -rf $(OBJDIR)/*.o $(EXECUTABLE)
 
-run-binary:
+run:
 	make clean && make && ./bin/clox
