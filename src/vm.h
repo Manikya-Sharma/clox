@@ -16,6 +16,8 @@ typedef struct
     // the top points just after the top element of stack
     // so empty when stackTop points to 0
     Value *stackTop;
+    // pointer to head of ll of objects
+    Obj *objects;
 } VM;
 
 typedef enum
@@ -24,6 +26,9 @@ typedef enum
     INTERPRET_COMPILE_ERROR,
     INTERPRET_RUNTIME_ERROR
 } InterpretResult;
+
+// expos the global vm object
+extern VM vm;
 
 void initVM();
 void freeVM();
