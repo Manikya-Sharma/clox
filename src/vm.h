@@ -2,6 +2,7 @@
 #define clox_vm_h
 
 #include "chunk.h"
+#include "table.h"
 #include "value.h"
 #define STACK_MAX 256
 
@@ -16,6 +17,7 @@ typedef struct
     // the top points just after the top element of stack
     // so empty when stackTop points to 0
     Value *stackTop;
+    Table strings;
     // pointer to head of ll of objects
     Obj *objects;
 } VM;
