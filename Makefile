@@ -25,3 +25,6 @@ clean:
 
 run:
 	make clean && make && ./bin/clox
+
+rebuild:
+	make clean && make

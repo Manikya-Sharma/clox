@@ -17,6 +17,7 @@ typedef struct
     // the top points just after the top element of stack
     // so empty when stackTop points to 0
     Value *stackTop;
+    Table globals;
     Table strings;
     // pointer to head of ll of objects
     Obj *objects;
