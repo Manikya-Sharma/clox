@@ -2,15 +2,30 @@
 #define clox_vm_h
 
 #include "chunk.h"
+#include "object.h"
 #include "table.h"
 #include "value.h"
-#define STACK_MAX 256
+
+#define FRAMES_MAX 64
+#define STACK_MAX (FRAMES_MAX * UINT8_COUNT)
 
 typedef struct
 {
-    Chunk *chunk;
-    // instruction pointer or the program counter
-    uint8_t *ip;
+    ObjFunction *function;
+    // function implementations have their own pointer so that we can return
+    // back to original control flow
+    uint8_t* ip;
+    // slots points to the VM's value stack at the slot
+    // that this function can use
+    Value *slots;
+
+} CallFrame;
+
+typedef struct
+{
+    // frames are not heap allocated because they should be fast
+    CallFrame frames[FRAMES_MAX];
+    int frameCount;
 
     // VM stack for executing instructions
     Value stack[STACK_MAX];
