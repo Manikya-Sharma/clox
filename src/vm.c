@@ -254,7 +254,7 @@ static InterpretResult run()
         {
             Value result = pop();
             vm.frameCount--;
-            if (vm.frameCount == 0)
+            if (vm.frameCount <= 1)
             {
                 pop();
                 return INTERPRET_OK;
