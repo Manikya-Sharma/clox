@@ -41,6 +41,21 @@ static void freeObject(Obj *object)
         FREE(ObjNative, object);
         break;
     }
+    case OBJ_CLOSURE:
+    {
+        ObjClosure *closure = (ObjClosure *)object;
+        FREE_ARRAY(ObjUpvalue *, closure->upvalues, closure->upvalueCount);
+        // we do not free the function because it might be referenced by
+        // multiple functions
+        // GC will free it
+        FREE(ObjClosure, object);
+        break;
+    }
+    case OBJ_UPVALUE:
+    {
+        FREE(ObjUpvalue, object);
+        break;
+    }
     }
 }
 

@@ -11,7 +11,7 @@
 
 typedef struct
 {
-    ObjFunction *function;
+    ObjClosure *closure;
     // function implementations have their own pointer so that we can return
     // back to original control flow
     uint8_t* ip;
@@ -34,6 +34,8 @@ typedef struct
     Value *stackTop;
     Table globals;
     Table strings;
+    // linked list of open upValues owned by VM
+    ObjUpvalue* openUpvalues;
     // pointer to head of ll of objects
     Obj *objects;
 } VM;

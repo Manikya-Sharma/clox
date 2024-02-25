@@ -25,6 +25,7 @@ ObjFunction *newFunction()
 {
     ObjFunction *function = ALLOCATE_OBJ(ObjFunction, OBJ_FUNCTION);
     function->arity = 0;
+    function->upvalueCount = 0;
     function->name = NULL;
     initChunk(&function->chunk);
     return function;
@@ -35,6 +36,35 @@ ObjNative *newNative(NativeFn function)
     ObjNative *native = ALLOCATE_OBJ(ObjNative, OBJ_NATIVE);
     native->function = function;
     return native;
+}
+
+ObjClosure *newClosure(ObjFunction *function)
+{
+
+    ObjUpvalue **upvalues = ALLOCATE(ObjUpvalue *, function->upvalueCount);
+
+    // this is done to ensure that GC does not see uninitialized memory
+    for (int i = 0; i < function->upvalueCount; i++)
+    {
+        upvalues[i] = NULL;
+    }
+
+    ObjClosure *closure = ALLOCATE_OBJ(ObjClosure, OBJ_CLOSURE);
+    closure->function = function;
+    closure->upvalues = upvalues;
+    // closure need not have had this field, but is required for garbage
+    // collector
+    closure->upvalueCount = function->upvalueCount;
+    return closure;
+}
+
+ObjUpvalue *newUpvalue(Value *slot)
+{
+    ObjUpvalue *upvalue = ALLOCATE_OBJ(ObjUpvalue, OBJ_UPVALUE);
+    upvalue->location = slot;
+    upvalue->next = NULL;
+    upvalue->closed = NIL_VAL;
+    return upvalue;
 }
 
 static ObjString *allocateString(char *chars, int length, uint32_t hash)
@@ -99,6 +129,17 @@ void printObject(Value value)
     case OBJ_NATIVE:
     {
         printf("<native fn>");
+        break;
+    }
+    case OBJ_CLOSURE:
+    {
+        printFunction(AS_CLOSURE(value)->function);
+        break;
+    }
+    case OBJ_UPVALUE:
+    {
+        // end user will not print
+        printf("upvalue");
         break;
     }
     }

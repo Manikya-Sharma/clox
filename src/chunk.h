@@ -11,6 +11,8 @@ typedef enum
     OP_TRUE,
     OP_FALSE,
     OP_POP,
+    OP_GET_UPVALUE,
+    OP_SET_UPVALUE,
     OP_SET_LOCAL,
     OP_GET_LOCAL,
     OP_SET_GLOBAL,
@@ -34,6 +36,8 @@ typedef enum
     OP_JUMP,
     // function call
     OP_CALL,
+    OP_CLOSURE,
+    OP_CLOSE_UPVALUE,
     OP_RETURN,
 } OpCode;
 

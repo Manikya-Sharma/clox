@@ -52,7 +52,15 @@ typedef struct
 {
     Token name;
     int depth;
+    // locals should know of they are acptured by an upvalue
+    bool isCaptured;
 } Local;
+
+typedef struct
+{
+    uint8_t index;
+    bool isLocal;
+} Upvalue;
 
 typedef enum
 {
@@ -70,6 +78,7 @@ typedef struct Compiler
     // an array of locals which will behave like a stack of scopes
     Local locals[UINT8_COUNT];
     int localCount;
+    Upvalue upvalues[UINT8_COUNT];
     int scopeDepth;
 } Compiler;
 
@@ -326,6 +335,7 @@ static void initCompiler(Compiler *compiler, FunctionType type)
     local->depth = 0;
     local->name.start = "";
     local->name.length = 0;
+    local->isCaptured = false;
 }
 
 static void number(bool canAssign)
@@ -410,6 +420,54 @@ static int resolveLocal(Compiler *compiler, Token *name)
     return -1;
 }
 
+static int addUpValue(Compiler *compiler, uint8_t index, bool isLocal)
+{
+    int upvalueCount = compiler->function->upvalueCount;
+
+    // check if variable already exists so no need for new upvalue
+    for (int i = 0; i < upvalueCount; i++)
+    {
+        Upvalue *upvalue = &compiler->upvalues[i];
+        if (upvalue->index == index && upvalue->isLocal == isLocal)
+        {
+            return i;
+        }
+    }
+
+    if (upvalueCount == UINT8_COUNT)
+    {
+        error("Too many closure variables in function");
+        return 0;
+    }
+
+    compiler->upvalues[upvalueCount].isLocal = isLocal;
+    compiler->upvalues[upvalueCount].index = index;
+    return compiler->function->upvalueCount++;
+}
+
+static int resolveUpvalue(Compiler *compiler, Token *name)
+{
+    if (compiler->enclosing == NULL)
+        return -1;
+
+    int local = resolveLocal(compiler->enclosing, name);
+    if (local != -1)
+    {
+        compiler->enclosing->locals[local].isCaptured = true;
+        return addUpValue(compiler, (uint8_t)local, true);
+    }
+
+    // either find an upvalue for enclosing compilers or return -1
+    int upvalue = resolveUpvalue(compiler->enclosing, name);
+    if (upvalue != -1)
+    {
+        // drill down and keep adding the upvalue in all the functions
+        return addUpValue(compiler, (uint8_t)upvalue, false);
+    }
+
+    return -1;
+}
+
 static void namedVariable(Token name, bool canAssign)
 {
     uint8_t getOp, setOp;
@@ -419,6 +477,12 @@ static void namedVariable(Token name, bool canAssign)
     {
         getOp = OP_GET_LOCAL;
         setOp = OP_SET_LOCAL;
+    } else if ((arg = resolveUpvalue(current, &name)) != -1)
+    {
+        // closure will maintain an array of upvalues for all local variables of
+        // the parent
+        getOp = OP_GET_UPVALUE;
+        setOp = OP_SET_UPVALUE;
     } else
     {
         arg = identifierConstant(&name);
@@ -585,6 +649,7 @@ static void addLocal(Token name)
     // -1 depth means the local variable is uninitialized in this local scope
     // for the edge case
     local->depth = -1;
+    local->isCaptured = false;
     local->depth = current->scopeDepth;
 }
 
@@ -675,8 +740,15 @@ static void endScope()
     while (current->localCount > 0 &&
            current->locals[current->localCount - 1].depth > current->scopeDepth)
     {
-        // remove all local variables from this scope
-        emitByte(OP_POP);
+        if (current->locals[current->localCount - 1].isCaptured)
+        {
+            // the local variable is referenced by upvalue
+            emitByte(OP_CLOSE_UPVALUE);
+        } else
+        {
+            // pop the local variable
+            emitByte(OP_POP);
+        }
         current->localCount--;
     }
 }
@@ -861,7 +933,14 @@ static void function(FunctionType type)
 
     // no need to call endScope() because compiler is ended
     ObjFunction *function = endCompiler();
-    emitBytes(OP_CONSTANT, makeConstant(OBJ_VAL(function)));
+    emitBytes(OP_CLOSURE, makeConstant(OBJ_VAL(function)));
+
+    // OP_CLOSURE has variable sized encoding
+    for (int i = 0; i < function->upvalueCount; i++)
+    {
+        emitByte(compiler.upvalues[i].isLocal ? 1 : 0);
+        emitByte(compiler.upvalues[i].index);
+    }
 }
 
 static void funDeclaration()
