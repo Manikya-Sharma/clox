@@ -1,6 +1,7 @@
 #include "chunk.h"
 #include "memory.h"
 #include "value.h"
+#include "vm.h"
 #include <stdlib.h>
 
 void initChunk(Chunk *chunk)
@@ -39,6 +40,10 @@ void writeChunk(Chunk *chunk, uint8_t byte, int line)
 // a small helper function only to imrpove modularity
 int addConstant(Chunk *chunk, Value value)
 {
+    // push and pop ensures that this value which lives on C stack is also
+    // considered by GC to avoid it becoming free before access
+    push(value);
     writeValueArray(&chunk->constants, value);
+    pop();
     return chunk->constants.count - 1;
 }

@@ -32,6 +32,8 @@ typedef enum
 struct Obj
 {
     ObjType type;
+    // marking for GC
+    bool isMarked;
     // create a linked list for garbage collector
     struct Obj *next;
 };

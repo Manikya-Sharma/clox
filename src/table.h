@@ -32,4 +32,9 @@ void tableAddAll(Table *from, Table *to);
 ObjString *tableFindString(Table *table, const char *chars, int length,
                            uint32_t hash);
 
+// mark values for GC
+void markTable(Table *table);
+// remove unreachable from table for GC
+void tableRemoveWhite(Table *table);
+
 #endif

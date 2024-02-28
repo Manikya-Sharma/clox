@@ -14,7 +14,7 @@ typedef struct
     ObjClosure *closure;
     // function implementations have their own pointer so that we can return
     // back to original control flow
-    uint8_t* ip;
+    uint8_t *ip;
     // slots points to the VM's value stack at the slot
     // that this function can use
     Value *slots;
@@ -35,9 +35,18 @@ typedef struct
     Table globals;
     Table strings;
     // linked list of open upValues owned by VM
-    ObjUpvalue* openUpvalues;
+    ObjUpvalue *openUpvalues;
     // pointer to head of ll of objects
     Obj *objects;
+
+    // gray stack for GC
+    int grayCount;
+    int grayCapacity;
+    Obj **grayStack;
+
+    // how frequently GC should run
+    size_t bytesAllocated;
+    size_t nextGC;
 } VM;
 
 typedef enum
