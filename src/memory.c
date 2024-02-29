@@ -1,6 +1,7 @@
 #include "memory.h"
 #include "compiler.h"
 #include "object.h"
+#include "table.h"
 #include "value.h"
 #include "vm.h"
 #include <stdlib.h>
@@ -120,6 +121,20 @@ static void freeObject(Obj *object)
         FREE(ObjUpvalue, object);
         break;
     }
+    case OBJ_CLASS:
+    {
+        FREE(ObjClass, object);
+        break;
+    }
+    case OBJ_INSTANCE:
+    {
+        ObjInstance *instance = (ObjInstance *)object;
+        freeTable(&instance->fields);
+        // free the table but not its fields, they will be taken care by GC.
+        // Others might have a reference
+        FREE(ObjInstance, object);
+        break;
+    }
     }
 }
 
@@ -192,6 +207,19 @@ static void blackenObject(Obj *object)
         {
             markObject((Obj *)closure->upvalues[i]);
         }
+        break;
+    }
+    case OBJ_CLASS:
+    {
+        ObjClass *klass = (ObjClass *)object;
+        markObject((Obj *)klass->name);
+        break;
+    }
+    case OBJ_INSTANCE:
+    {
+        ObjInstance *instance = (ObjInstance *)object;
+        markObject((Obj *)instance->klass);
+        markTable(&instance->fields);
         break;
     }
     }
