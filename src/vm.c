@@ -81,6 +81,10 @@ void initVM()
     initTable(&vm.strings);
     initTable(&vm.globals);
 
+    // we cant let GC run at initial string allocation, so first chagge to NULL
+    vm.initString = NULL;
+    vm.initString = copyString("init", 4);
+
     defineNative("clock", clockNative);
 }
 
@@ -88,6 +92,7 @@ void freeVM()
 {
     freeTable(&vm.strings);
     freeTable(&vm.globals);
+    vm.initString = NULL;
     freeObjects();
 }
 
@@ -172,7 +177,25 @@ static bool callValue(Value callee, int argCount)
         {
             ObjClass *klass = AS_CLASS(callee);
             vm.stackTop[-argCount - 1] = OBJ_VAL(newInstance(klass));
+
+            // init() method
+            Value initializer;
+            if (tableGet(&klass->methods, vm.initString, &initializer))
+            {
+                return call(AS_CLOSURE(initializer), argCount);
+            } else if (argCount != 0)
+            {
+                runtimeError("Expected 0 arguments but got %d", argCount);
+                return false;
+            }
             return true;
+        }
+        case OBJ_BOUND_METHOD:
+        {
+            ObjBoundMethod *bound = AS_BOUND_METHOD(callee);
+            // put the 'this' variable at slot zero
+            vm.stackTop[-argCount - 1] = bound->receiver;
+            return call(bound->method, argCount);
         }
         default:
             // object cannot be called
@@ -225,6 +248,30 @@ static void closeUpvalues(Value *last)
         upvalue->location = &upvalue->closed;
         vm.openUpvalues = upvalue->next;
     }
+}
+
+static void defineMethod(ObjString *name)
+{
+    Value method = peek(0);
+    ObjClass *klass = AS_CLASS(peek(1));
+    // add the closure to methods table
+    tableSet(&klass->methods, name, method);
+    // remove the closure
+    pop();
+}
+
+static bool bindMethod(ObjClass *klass, ObjString *name)
+{
+    Value method;
+    if (!tableGet(&klass->methods, name, &method))
+    {
+        runtimeError("Undefined property '%s'", name->chars);
+        return false;
+    }
+    ObjBoundMethod *bound = newBoundMethod(peek(0), AS_CLOSURE(method));
+    pop();
+    push(OBJ_VAL(bound));
+    return true;
 }
 
 static InterpretResult run()
@@ -494,8 +541,11 @@ static InterpretResult run()
                 push(value);
                 break;
             }
-            runtimeError("Undefined property '%s'", name->chars);
-            return INTERPRET_RUNTIME_ERROR;
+            if (!bindMethod(instance->klass, name))
+            {
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            break;
         }
         case OP_SET_PROPERTY:
         {
@@ -511,6 +561,9 @@ static InterpretResult run()
             push(value);
             break;
         }
+        case OP_METHOD:
+            defineMethod(READ_STRING());
+            break;
         }
     }
 #undef READ_BYTE

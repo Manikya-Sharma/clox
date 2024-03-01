@@ -47,6 +47,9 @@ typedef struct
     // how frequently GC should run
     size_t bytesAllocated;
     size_t nextGC;
+
+    // the init function string is interned and stored in vm itself
+    ObjString *initString;
 } VM;
 
 typedef enum

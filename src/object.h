@@ -3,8 +3,8 @@
 
 #include "chunk.h"
 #include "common.h"
-#include "value.h"
 #include "table.h"
+#include "value.h"
 
 #define OBJ_TYPE(value) (AS_OBJ(value)->type)
 
@@ -15,6 +15,7 @@
 #define IS_CLOSURE(value) isObjType(value, OBJ_CLOSURE)
 #define IS_CLASS(value) isObjType(value, OBJ_CLASS)
 #define IS_INSTANCE(value) isObjType(value, OBJ_INSTANCE)
+#define IS_BOUND_METHOD(value) isObjType(value, OBJ_BOUND_METHOD)
 
 #define AS_STRING(value) ((ObjString *)AS_OBJ(value))
 #define AS_CSTRING(value) (((ObjString *)AS_OBJ(value))->chars)
@@ -22,7 +23,8 @@
 #define AS_NATIVE(value) (((ObjNative *)AS_OBJ(value))->function)
 #define AS_CLOSURE(value) ((ObjClosure *)AS_OBJ(value))
 #define AS_CLASS(value) ((ObjClass *)AS_OBJ(value))
-#define AS_INSTANCE(value) ((ObjInstance*)AS_OBJ(value))
+#define AS_INSTANCE(value) ((ObjInstance *)AS_OBJ(value))
+#define AS_BOUND_METHOD(value) ((ObjBoundMethod *)AS_OBJ(value))
 
 typedef enum
 {
@@ -33,6 +35,7 @@ typedef enum
     OBJ_UPVALUE,
     OBJ_CLASS,
     OBJ_INSTANCE,
+    OBJ_BOUND_METHOD,
 } ObjType;
 
 // type punning / struct inheritance
@@ -105,6 +108,7 @@ typedef struct
 {
     Obj obj;
     ObjString *name;
+    Table methods;
 } ObjClass;
 
 typedef struct
@@ -113,6 +117,14 @@ typedef struct
     ObjClass *klass;
     Table fields;
 } ObjInstance;
+
+// the separate struct for class methods which can bound ot 'this'
+typedef struct
+{
+    Obj obj;
+    Value receiver;
+    ObjClosure *method;
+} ObjBoundMethod;
 
 ObjFunction *newFunction();
 
@@ -128,7 +140,9 @@ ObjString *takeString(char *chars, int length);
 
 ObjClass *newClass(ObjString *name);
 
-ObjInstance* newInstance(ObjClass* klass);
+ObjInstance *newInstance(ObjClass *klass);
+
+ObjBoundMethod *newBoundMethod(Value receiver, ObjClosure *method);
 
 void printObject(Value value);
 

@@ -67,6 +67,8 @@ typedef enum
 {
     TYPE_FUNCTION,
     TYPE_SCRIPT,
+    TYPE_METHOD,
+    TYPE_INITIALIZER,
 } FunctionType;
 
 typedef struct Compiler
@@ -83,8 +85,17 @@ typedef struct Compiler
     int scopeDepth;
 } Compiler;
 
+typedef struct ClassCompiler
+{
+    struct ClassCompiler *enclosing;
+} ClassCompiler;
+
 Parser parser;
 Compiler *current = NULL;
+
+// tis will solve the problem of misuse of 'this' and also help in nesting
+// classes
+ClassCompiler *currentClass = NULL;
 
 static Chunk *currentChunk() { return &current->function->chunk; }
 
@@ -155,8 +166,14 @@ static void emitBytes(uint8_t byte1, uint8_t byte2)
 
 static void emitReturn()
 {
-    // implicitly return Nil
-    emitByte(OP_NIL);
+    if (current->type == TYPE_INITIALIZER)
+    {
+        emitBytes(OP_GET_LOCAL, 0);
+    } else
+    {
+        // implicitly return Nil
+        emitByte(OP_NIL);
+    }
     // return
     emitByte(OP_RETURN);
 }
@@ -334,9 +351,18 @@ static void initCompiler(Compiler *compiler, FunctionType type)
     // locals for VM's own requirements
     Local *local = &current->locals[current->localCount++];
     local->depth = 0;
-    local->name.start = "";
-    local->name.length = 0;
     local->isCaptured = false;
+
+    // the first empty slot of methods can be used for storing 'this'
+    if (type != TYPE_FUNCTION)
+    {
+        local->name.start = "this";
+        local->name.length = 4;
+    } else
+    {
+        local->name.start = "";
+        local->name.length = 0;
+    }
 }
 
 static void number(bool canAssign)
@@ -568,6 +594,16 @@ static void dot(bool canAssign)
     }
 }
 
+static void this_(bool canAssign)
+{
+    if (currentClass == NULL)
+    {
+        error("Can't use 'this' outside of a class");
+    }
+    // 'this' will automatically captured as an upvalue
+    variable(false);
+}
+
 // using C99 array designators instead of manual indexing
 ParseRule rules[] = {
     [TOKEN_LEFT_PAREN] = {grouping, call, PREC_CALL},
@@ -604,7 +640,7 @@ ParseRule rules[] = {
     [TOKEN_PRINT] = {NULL, NULL, PREC_NONE},
     [TOKEN_RETURN] = {NULL, NULL, PREC_NONE},
     [TOKEN_SUPER] = {NULL, NULL, PREC_NONE},
-    [TOKEN_THIS] = {NULL, NULL, PREC_NONE},
+    [TOKEN_THIS] = {this_, NULL, PREC_NONE},
     [TOKEN_TRUE] = {literal, NULL, PREC_NONE},
     [TOKEN_VAR] = {NULL, NULL, PREC_NONE},
     [TOKEN_WHILE] = {NULL, NULL, PREC_NONE},
@@ -883,6 +919,10 @@ static void returnStatement()
         emitReturn();
     } else
     {
+        if (current->type == TYPE_INITIALIZER)
+        {
+            error("Can't return a value from an initializer");
+        }
         expression();
         consume(TOKEN_SEMICOLON, "Expect ';' after return value");
         emitByte(OP_RETURN);
@@ -969,9 +1009,29 @@ static void funDeclaration()
     defineVariable(global);
 }
 
+// each method will be given its own bytecode, instead of having a single
+// bytecode for class declaration
+static void method()
+{
+    consume(TOKEN_IDENTIFIER, "Expect method name");
+    uint8_t constant = identifierConstant(&parser.previous);
+
+    FunctionType type = TYPE_METHOD;
+
+    if (parser.previous.length == 4 &&
+        memcmp(parser.previous.start, "init", 4) == 0)
+    {
+        type = TYPE_INITIALIZER;
+    }
+
+    function(type);
+    emitBytes(OP_METHOD, constant);
+}
+
 static void classDeclaration()
 {
     consume(TOKEN_IDENTIFIER, "Expect class name");
+    Token className = parser.previous;
     uint8_t nameConstant = identifierConstant(&parser.previous);
     declareVariable();
 
@@ -979,8 +1039,26 @@ static void classDeclaration()
     // define class name before boddy to allow its use
     defineVariable(nameConstant);
 
+    // update the global currentClass linked list
+    ClassCompiler classCompiler;
+    classCompiler.enclosing = currentClass;
+    currentClass = &classCompiler;
+
+    // put class name on top of stack so that methods can bound to it
+    namedVariable(className, false);
+
     consume(TOKEN_LEFT_BRACE, "Expect '{' before class body");
+
+    while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF))
+    {
+        method();
+    }
+
     consume(TOKEN_RIGHT_BRACE, "Expect '}' after class body");
+    emitByte(OP_POP);
+
+    // remove class from gloabl linked list
+    currentClass = currentClass->enclosing;
 }
 
 static void declaration()
