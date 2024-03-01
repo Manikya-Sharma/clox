@@ -43,6 +43,8 @@ typedef enum
     OP_SET_PROPERTY,
     OP_GET_PROPERTY,
     OP_METHOD,
+    // invoke a method directly, instead of late bound
+    OP_INVOKE,
 } OpCode;
 
 typedef struct
