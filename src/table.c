@@ -24,7 +24,9 @@ void freeTable(Table *table)
 
 static Entry *findEntry(Entry *entries, int capacity, ObjString *key)
 {
-    uint32_t index = key->hash % capacity;
+    // modulo operator is too slow
+    // modulo to power of two is same as ANS of one minus that power of 2
+    uint32_t index = key->hash & (capacity - 1);
     Entry *tombstone = NULL;
     for (;;)
     {
@@ -50,7 +52,7 @@ static Entry *findEntry(Entry *entries, int capacity, ObjString *key)
             return entry;
         }
         // linear probing
-        index = (index + 1) % capacity;
+        index = (index + 1) & (capacity - 1);
     }
 }
 
@@ -153,7 +155,7 @@ ObjString *tableFindString(Table *table, const char *chars, int length,
     if (table->count == 0)
         return NULL;
 
-    uint32_t index = hash % table->capacity;
+    uint32_t index = hash & (table->capacity - 1);
     for (;;)
     {
         Entry *entry = &table->entries[index];
@@ -168,7 +170,7 @@ ObjString *tableFindString(Table *table, const char *chars, int length,
             // found
             return entry->key;
         }
-        index = (index + 1) % table->capacity;
+        index = (index + 1) & (table->capacity - 1);
     }
 }
 
