@@ -607,6 +607,34 @@ static InterpretResult run()
             frame = &vm.frames[vm.frameCount - 1];
             break;
         }
+        case OP_INHERIT:
+        {
+            Value superclass = peek(1);
+
+            if (!IS_CLASS(superclass))
+            {
+                runtimeError("Superclass must be a class");
+                return INTERPRET_RUNTIME_ERROR;
+            }
+
+            ObjClass *subclass = AS_CLASS(peek(0));
+            // methods in subclass will override the methods copied from
+            // superclass
+            tableAddAll(&AS_CLASS(superclass)->methods, &subclass->methods);
+            pop(); // subclass
+            break;
+        }
+        case OP_GET_SUPER:
+        {
+            ObjString *name = READ_STRING();
+            ObjClass *superclass = AS_CLASS(pop());
+            // superclass is sitting on top of the stack
+            if (!bindMethod(superclass, name))
+            {
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            break;
+        }
         }
     }
 #undef READ_BYTE
